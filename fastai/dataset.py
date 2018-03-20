@@ -88,7 +88,7 @@ def copy_or_move_with_subdirs(subdir_lst, src, dst, r, move=False):
             do(f, os.path.join(dst, subdir, os.path.split(f)[1]))
 
 def n_hot(ids, c):
-    res = np.zeros((c,), dtype=np.int8)
+    res = np.zeros((c,), dtype=np.float32)
     res[ids] = 1
     return res
 
@@ -211,9 +211,9 @@ class FilesDataset(BaseDataset):
     def __init__(self, fnames, transform, path):
         self.path,self.fnames = path,fnames
         super().__init__(transform)
-    def get_n(self): return len(self.y)
     def get_sz(self): return self.transform.sz
     def get_x(self, i): return open_image(os.path.join(self.path, self.fnames[i]))
+    def get_n(self): return len(self.fnames)
 
     def resize_imgs(self, targ, new_path):
         dest = resize_imgs(self.fnames, targ, self.path, new_path)
@@ -229,6 +229,7 @@ class FilesDataset(BaseDataset):
         if len(arr.shape)==3: arr = arr[None]
         return self.transform.denorm(np.rollaxis(arr,1,4))
 
+
 class FilesArrayDataset(FilesDataset):
     def __init__(self, fnames, y, transform, path):
         self.y=y
@@ -237,7 +238,6 @@ class FilesArrayDataset(FilesDataset):
     def get_y(self, i): return self.y[i]
     def get_c(self):
         return self.y.shape[1] if len(self.y.shape)>1 else 0
-
 
 class FilesIndexArrayDataset(FilesArrayDataset):
     def get_c(self): return int(self.y.max())+1
@@ -279,8 +279,8 @@ class ModelData():
 
     @classmethod
     def from_dls(cls, path,trn_dl,val_dl,test_dl=None):
-        trn_dl,val_dl = DataLoader(trn_dl),DataLoader(val_dl)
-        if test_dl: test_dl = DataLoader(test_dl)
+        #trn_dl,val_dl = DataLoader(trn_dl),DataLoader(val_dl)
+        #if test_dl: test_dl = DataLoader(test_dl)
         return cls(path, trn_dl, val_dl, test_dl)
 
     @property
@@ -321,13 +321,13 @@ class ImageData(ModelData):
     def resized(self, dl, targ, new_path):
         return dl.dataset.resize_imgs(targ,new_path) if dl else None
 
-    def resize(self, targ, new_path):
+    def resize(self, targ_sz, new_path='tmp'):
         new_ds = []
         dls = [self.trn_dl,self.val_dl,self.fix_dl,self.aug_dl]
         if self.test_dl: dls += [self.test_dl, self.test_aug_dl]
         else: dls += [None,None]
         t = tqdm_notebook(dls)
-        for dl in t: new_ds.append(self.resized(dl, targ, new_path))
+        for dl in t: new_ds.append(self.resized(dl, targ_sz, new_path))
         t.close()
         return self.__class__(new_ds[0].path, new_ds, self.bs, self.num_workers, self.classes)
 
